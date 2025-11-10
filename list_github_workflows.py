@@ -16,6 +16,7 @@ import shutil
 import tempfile
 import yaml
 import argparse
+import json
 from pathlib import Path
 from typing import List, Dict, Set
 import sys
@@ -152,68 +153,17 @@ def analyze_repository_workflows(repo_name: str, repo_path: str) -> Dict[str, Se
     return all_uses
 
 
-def generate_report(results: Dict[str, Dict[str, Set[str]]]):
-    """Generate and print a comprehensive report."""
-    print("\n" + "="*80)
-    print("WORKFLOW USAGE REPORT")
-    print("="*80)
+def output_json(results: Dict[str, Dict[str, Set[str]]]):
+    """Convert results to JSON-serializable format and output as JSON."""
+    # Convert sets to lists for JSON serialization
+    json_results = {}
+    for repo_name, workflows in results.items():
+        json_results[repo_name] = {}
+        for workflow_name, uses_set in workflows.items():
+            json_results[repo_name][workflow_name] = sorted(list(uses_set))
     
-    # Summary statistics
-    total_repos = len(results)
-    repos_with_workflows = sum(1 for workflows in results.values() if workflows)
-    total_workflows = sum(len(workflows) for workflows in results.values())
-    
-    print(f"\nSUMMARY:")
-    print(f"Total repositories analyzed: {total_repos}")
-    print(f"Repositories with workflows: {repos_with_workflows}")
-    print(f"Total workflow files found: {total_workflows}")
-    
-    # Collect all unique external actions
-    all_external_actions = set()
-    for workflows in results.values():
-        for uses_set in workflows.values():
-            all_external_actions.update(uses_set)
-    
-    print(f"Unique external actions used: {len(all_external_actions)}")
-    
-    print("\n" + "-"*80)
-    print("DETAILED RESULTS BY REPOSITORY:")
-    print("-"*80)
-    
-    for repo_name in sorted(results.keys()):
-        workflows = results[repo_name]
-        
-        if not workflows:
-            print(f"\n{repo_name}: No workflows found")
-            continue
-        
-        print(f"\n{repo_name}:")
-        for workflow_name in sorted(workflows.keys()):
-            uses_refs = workflows[workflow_name]
-            print(f"  {workflow_name}:")
-            if uses_refs:
-                for use_ref in sorted(uses_refs):
-                    print(f"    - {use_ref}")
-            else:
-                print(f"    - No external actions")
-    
-    # Most popular external actions
-    if all_external_actions:
-        print("\n" + "-"*80)
-        print("MOST POPULAR EXTERNAL ACTIONS:")
-        print("-"*80)
-        
-        action_counts = {}
-        for workflows in results.values():
-            for uses_set in workflows.values():
-                for action in uses_set:
-                    action_counts[action] = action_counts.get(action, 0) + 1
-        
-        # Sort by usage count (descending)
-        sorted_actions = sorted(action_counts.items(), key=lambda x: x[1], reverse=True)
-        
-        for action, count in sorted_actions[:20]:  # Top 20
-            print(f"{count:3d} uses: {action}")
+    # Output as JSON
+    print(json.dumps(json_results, indent=2))
 
 
 def main():
@@ -264,8 +214,8 @@ def main():
             else:
                 results[repo_name] = {}
         
-        # Generate report
-        generate_report(results)
+        # Output JSON
+        output_json(results)
 
 
 if __name__ == "__main__":
